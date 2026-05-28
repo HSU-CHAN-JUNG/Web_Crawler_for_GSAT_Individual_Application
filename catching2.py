@@ -1,159 +1,77 @@
-import os
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from openpyxl import Workbook
-# from sympy import re
+import time
 import re
+import json
 
-# 1. 設定初始網址與 Headers 偽裝
-base_url = "https://www.cac.edu.tw/apply115/system/ColQry_115xappLyfOrStu_Azd5gP29/"
-start_url = urljoin(base_url, "TotalGsdShow.htm")
-
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+# 全局變數：核心網址與 Headers 設定
+MAIN_URL = "https://www.cac.edu.tw/apply115/system/ColQry_115xappLyfOrStu_Azd5gP29/TotalGsdShow.htm"
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Referer': MAIN_URL  # 關鍵：下一隻程式存取時，必須假裝是從這個主頁點進去的
 }
 
-# 2. 建立 Excel 活頁簿與標頭
-wb = Workbook()
-ws = wb.active
-ws.append(["學校", "系所", "數學採計狀態"])  # 先寫入標頭，方便閱讀
-excel_file = '採計數學.xlsx'
-
-print("開始爬取 115 學年度個人申請校系分則...")
-
-# 啟用 requests Session 提高連線效率
-session = requests.Session()
-session.headers.update(headers)
-
-try:
-    response = session.get(start_url)
-    if response.status_code != 200:
-        print(f"無法連線到主頁面，狀態碼：{response.status_code}")
-        exit()
+def step1_get_all_links():
+    """ 第一步：負責抓取所有學校的子網頁連結 """
+    print("【第一階段】開始抓取所有網頁連結...")
+    session = requests.Session()
+    response = session.get(MAIN_URL, headers={'User-Agent': HEADERS['User-Agent']})
+    response.encoding = 'utf-8'
+    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    all_urls = []
+    
+    for a_tag in soup.find_all('a'):
+        href = a_tag.get('href')
+        school_name = a_tag.text.strip()
         
-    # 解析主頁面（所有學校列表）
-    soup = BeautifulSoup(response.content, "html.parser", from_encoding="utf-8")
-    
-    # 抓取所有學校的連結（過濾掉非學校簡章的 href，通常包含 'html' 或 'htm'）
-    university_links = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        # print(href)
-        # 排除無關連結，只拿學校代碼相關的網址
-        # if "htm" in href and "TotalGsdShow" not in href:
-        university_links.append(urljoin(base_url, href))
-    
-
-    # 移除重複的連結並保持順序
-    university_links = list(dict.fromkeys(university_links))
-    print(f"共找到 {len(university_links)} 所學校，開始深入抓取系所資料...")
-
-    row_idx = 2  # 從第二行開始寫入資料（第一行是標頭）
-    
-    # 3. 遍歷每所學校
-    for uni_url in university_links:
-        print(uni_url)
-        uni_response = session.get(uni_url)
-        if uni_response.status_code != 200:
-            continue
+        if href and "ShowSchGsd.php" in href:
+            full_url = urljoin(MAIN_URL, href)
+            # 將學校名稱與完整網址包成字典存起來
+            all_urls.append({
+                'name': school_name,
+                'url': full_url
+            })
             
-        uni_soup = BeautifulSoup(uni_response.content, "html.parser", from_encoding="utf-8")
-        # uni_soup = BeautifulSoup(uni_response.content, "html5lib")
+    print(f"成功收集到 {len(all_urls)} 個學校連結。\n")
+    return all_urls
+
+def step2_process_links(url_list):
+    """ 第二步：接收上一步的連結列表，並帶上 Referer 進行深入爬取 """
+    print("【第二階段】開始處理收集到的連結...")
+    session = requests.Session()
+    
+    university_codes = []
+    for item in url_list:
         
-        # 抓取該學校內所有系所的詳細資料連結
-        # dept_links = []
-        # for a in uni_soup.find_all("a", href=True):
-        #     # print(a.text)
-        #     if "詳細資料" in a.text or "./html/" in a["href"]:
-        #         # 自動將 ./html/115_001012.htm?v=1.0 轉為完整網址
-        #         full_url = urljoin(base_url, a["href"])
-        #         dept_links.append(full_url)
-
-        # dept_links = list(dict.fromkeys(dept_links))
+        # 關鍵：這裏的 headers 一定要帶有含有 Referer 的那組設定
+        response = session.get(item['url'], headers=HEADERS)
+        response.encoding = 'utf-8'
         
-#         code_unidept_links = []
-#         code_pattern = re.compile(r"\((?P<code>\d{6})\)")
+        if response.status_code == 200:
+            codes = re.findall(rf"\d{{6}}", response.text)
+            university_codes.append({
+                'name': item['name'],
+                'codes': list(codes)
+            })
+            print(f"成功抓到{item['name']}代碼數量: {len(set(codes))} 個")
 
-#         # 尋找所有 color 屬性包含 FF0000（不分大小寫）的 font 標籤
-#         font_tags = soup.find_all(
-#         "font", attrs={"color": re.compile(r"#FF0000", re.IGNORECASE)}
-# )
-#         for tag in font_tags:
-#             text = tag.get_text().strip()
-#             match = code_pattern.search(text)
-#             if match:
-#                 # 提取出純數字代碼，例如 "001012"
-#                 dept_code = match.group("code")
-#                 print(f"找到標籤文字: {text} -> 提取出代碼: {dept_code}")
+        else:
+            print(f"  => 請求失敗，狀態碼：{response.status_code}")
+            
+        time.sleep(1) # 良好爬蟲習慣，每次請求稍微限制速度
+    
+    with open("collection_codes.json", "w", encoding="utf-8") as f:
+        # 使用 json.dump 將資料寫入檔案
+        json.dump(university_codes, f, ensure_ascii=False, indent=4)
 
-        font_tags = soup.select("font[color='#FF0000']")
+    print("JSON 檔案寫入成功！")
 
-        for tag in font_tags:
-            # 取得裡面的文字，這時會拿到 "(001012)"
-            raw_code = tag.text
+# 執行主流程
+if __name__ == "__main__":
+    # 1. 執行第一隻程式（Function 1）
+    collected_links = step1_get_all_links()
 
-            # 用 strip 或是 replace 把括號去掉，變成純數字 "001012"
-            clean_code = raw_code.replace("(", "").replace(")", "").strip()
-            print(clean_code)
-
-        dept_links = []
-        # 4. 遍歷每個系所的詳細頁面
-        for dept_url in dept_links:
-            try:
-                dept_response = session.get(dept_url)
-                if dept_response.status_code != 200:
-                    continue
-                    
-                dept_soup = BeautifulSoup(dept_response.content, "html.parser", from_encoding="utf-8")
-                
-                # 取得學校名稱與系所名稱
-                college_el = dept_soup.find("div", class_="colname")
-                dept_el = dept_soup.find("div", class_="gsdname")
-                
-                print(college_el, dept_el)
-                break
-
-                if not college_el or not dept_el:
-                    continue
-                    
-                college_text = college_el.text.strip()
-                dept_text = dept_el.text.strip()
-                
-                # 5. 修改原本 Selenium 聯集/交集不穩定的問題
-                # 直接撈取整個網頁的文字，或者撈取表格(td)內的文字來判斷最精準
-                page_text = dept_soup.get_text()
-                
-                # 判斷採計科目
-                has_mathA = "數學A" in page_text
-                has_mathB = "數學B" in page_text
-                
-                if has_mathA and has_mathB:
-                    math_status = "均採計"
-                elif has_mathA:
-                    math_status = "數學A"
-                elif has_mathB:
-                    math_status = "數學B"
-                else:
-                    math_status = "均不採計"
-                
-                # 寫入 Excel
-                ws.cell(row_idx, 1).value = college_text
-                ws.cell(row_idx, 2).value = dept_text
-                ws.cell(row_idx, 3).value = math_status
-                
-                print(f"已記錄：{college_text} - {dept_text} ({math_status})")
-                row_idx += 1
-                
-            except Exception as e:
-                print(f"處理系所頁面時發生錯誤: {dept_url}, 錯誤: {e}")
-                
-        # 爬完一所學校就存檔一次，避免程式中斷資料遺失
-        wb.save(excel_file)
-
-    print(f"\n🎉 爬取完成！資料已成功儲存至 {excel_file}")
-
-except Exception as e:
-    print(f"程式執行發生異常: {e}")
+    # 2. 執行下一隻程式（Function 2），並把連結陣列傳給它
+    step2_process_links(collected_links)

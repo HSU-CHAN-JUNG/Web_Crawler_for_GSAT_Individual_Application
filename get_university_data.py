@@ -34,10 +34,11 @@ def get_university_data(colno, colname):
     soup = BeautifulSoup(response.text, "html.parser")
     print(f"網頁標題: {soup.title.text if soup.title else '失敗'}")
 
-    # 看看有沒有抓到政大的科系代碼 (006xxx)
-    codes = re.findall(rf"\({colno}\d{{3}}\)", response.text)
+    # 看看有沒有抓到政大的科系代碼 006xxx
+    codes = re.findall(rf"\d{{6}}", response.text)
+    # codes = re.findall(rf"\({colno}\d{{3}}\)", response.text)
     print(f"成功抓到{colname}代碼數量: {len(set(codes))} 個")
 
 if __name__ == "__main__":
-    # 以國立政治大學為例，colno=006，colname=國立政治大學
+    # 以國立台灣大學為例，colno=001，colname=國立台灣大學
     get_university_data(colno="001", colname="國立台灣大學")
