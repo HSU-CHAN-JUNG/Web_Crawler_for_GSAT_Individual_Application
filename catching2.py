@@ -3,6 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from openpyxl import Workbook
+# from sympy import re
+import re
 
 # 1. 設定初始網址與 Headers 偽裝
 base_url = "https://www.cac.edu.tw/apply115/system/ColQry_115xappLyfOrStu_Azd5gP29/"
@@ -38,8 +40,8 @@ try:
     # 抓取所有學校的連結（過濾掉非學校簡章的 href，通常包含 'html' 或 'htm'）
     university_links = []
     for a in soup.find_all("a", href=True):
-        # print(a)
         href = a["href"]
+        # print(href)
         # 排除無關連結，只拿學校代碼相關的網址
         # if "htm" in href and "TotalGsdShow" not in href:
         university_links.append(urljoin(base_url, href))
@@ -58,21 +60,46 @@ try:
         if uni_response.status_code != 200:
             continue
             
-        # uni_soup = BeautifulSoup(uni_response.content, "html.parser", from_encoding="utf-8")
-        uni_soup = BeautifulSoup(uni_response.content, "html5lib")
+        uni_soup = BeautifulSoup(uni_response.content, "html.parser", from_encoding="utf-8")
+        # uni_soup = BeautifulSoup(uni_response.content, "html5lib")
         
         # 抓取該學校內所有系所的詳細資料連結
-        dept_links = []
-        for a in uni_soup.find_all("a", href=True):
-            print(a.text)
-            if "詳細資料" in a.text or "./html/" in a["href"]:
-                # 自動將 ./html/115_001012.htm?v=1.0 轉為完整網址
-                full_url = urljoin(base_url, a["href"])
-                dept_links.append(full_url)
+        # dept_links = []
+        # for a in uni_soup.find_all("a", href=True):
+        #     # print(a.text)
+        #     if "詳細資料" in a.text or "./html/" in a["href"]:
+        #         # 自動將 ./html/115_001012.htm?v=1.0 轉為完整網址
+        #         full_url = urljoin(base_url, a["href"])
+        #         dept_links.append(full_url)
 
-        dept_links = list(dict.fromkeys(dept_links))
+        # dept_links = list(dict.fromkeys(dept_links))
         
-        print(dept_links)
+#         code_unidept_links = []
+#         code_pattern = re.compile(r"\((?P<code>\d{6})\)")
+
+#         # 尋找所有 color 屬性包含 FF0000（不分大小寫）的 font 標籤
+#         font_tags = soup.find_all(
+#         "font", attrs={"color": re.compile(r"#FF0000", re.IGNORECASE)}
+# )
+#         for tag in font_tags:
+#             text = tag.get_text().strip()
+#             match = code_pattern.search(text)
+#             if match:
+#                 # 提取出純數字代碼，例如 "001012"
+#                 dept_code = match.group("code")
+#                 print(f"找到標籤文字: {text} -> 提取出代碼: {dept_code}")
+
+        font_tags = soup.select("font[color='#FF0000']")
+
+        for tag in font_tags:
+            # 取得裡面的文字，這時會拿到 "(001012)"
+            raw_code = tag.text
+
+            # 用 strip 或是 replace 把括號去掉，變成純數字 "001012"
+            clean_code = raw_code.replace("(", "").replace(")", "").strip()
+            print(clean_code)
+
+        dept_links = []
         # 4. 遍歷每個系所的詳細頁面
         for dept_url in dept_links:
             try:
