@@ -7,6 +7,7 @@ import json
 from itertools import chain
 import csv
 import os
+import time
 
 # 全局變數：核心網址與 Headers 設定
 MAIN_URL = "https://www.cac.edu.tw/apply115/system/ColQry_115xappLyfOrStu_Azd5gP29/TotalGsdShow.htm"
@@ -58,11 +59,11 @@ def step2_process_links(url_list):
             #     'name': item['name'],
             #     'codes': list(set(codes))
             # })
-            print(f"成功抓到{item['name']}代碼數量: {len(set(codes))} 個")
+            print(f"成功抓到{item['name']}代碼數量: {len(dict.fromkeys(codes))} 個")
 
             with open("collection_codes.jsonl", "a", encoding="utf-8") as f:
                 # f.write(json.dumps(university_codes, ensure_ascii=False) + "\n")
-                f.write(json.dumps({'codes': list(set(codes))}, ensure_ascii=False) + "\n")
+                f.write(json.dumps({'codes': list(dict.fromkeys(codes))[1:]}, ensure_ascii=False) + "\n")
 
         else:
             print(f"  => 請求失敗，狀態碼：{response.status_code}")
@@ -87,7 +88,6 @@ def step3_get_all_pdf(code):
     session = requests.Session()
     session.headers.update(headers)
 
-    init_csv()
     try:
         response = session.get(base_url)
         if response.status_code != 200:
@@ -193,7 +193,7 @@ def fill_grades_csv(school_name, department, subjects, grades, filename="score_t
 
 # 執行主流程
 if __name__ == "__main__":
-
+    start_time = time.time()
     # 1. 執行第一隻程式（Function 1）
     collected_links = step1_get_all_links()
 
@@ -210,6 +210,9 @@ if __name__ == "__main__":
     all_codes = chain.from_iterable(item["codes"] for item in data)
 
     # 3. 執行第三隻程式（Function 3），並把所有的 code 傳給它
+    init_csv()  # 在開始抓取 PDF 前，先確保 CSV 已經初始化好了
     for code in all_codes:
         step3_get_all_pdf(code)
-    
+        
+    end_time = time.time()
+    print(f"總共花費 {end_time - start_time:.2f} 秒完成所有任務！")

@@ -1,78 +1,72 @@
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-import time
-import re
-import json
-from itertools import chain
+import csv
+import os
 
-def step3_get_all_pdf(code):
-    # 1. 設定初始網址與 Headers 偽裝
-    base_url = f"https://www.cac.edu.tw/apply115/system/ColQry_115xappLyfOrStu_Azd5gP29/html/115_{code}.htm?v=1.0"
+def init_csv(filename="score_table.csv"):
+    """初始化 CSV 檔案，單純寫入第一行的標題欄位"""
+    headers = ["學校", "學系", "國文", "數學A", "數學B", "英文", "自然", "社會"]
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
+    with open(filename, mode="w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)  # 只寫入第一行標題
 
-    # 啟用 requests Session 提高連線效率
-    session = requests.Session()
-    session.headers.update(headers)
-
-    try:
-        response = session.get(base_url)
-        if response.status_code != 200:
-            print(f"無法連線到主頁面，狀態碼：{response.status_code}")
-            exit()
-            
-        # 解析主頁面（所有學校列表）
-        soup = BeautifulSoup(response.content, "html.parser", from_encoding="utf-8")
-       
-        code_title_td = soup.find("td", string="校系代碼")
-        # init_csv("score_table.csv")
-
-        if code_title_td:
-            # 2. 找到「校系代碼」所在的整行 <tr>
-            parent_tr = code_title_td.find_parent("tr")
-
-            # 3. 在這一行裡面，尋找 class 包含 "g3" 的 <td>
-            # 觀察 HTML 發現，科目、檢定、篩選倍率都帶有 g3，但科目是第一個
-            target_td = parent_tr.find_all("td", class_="g3")
-
-            if target_td and len(target_td) >= 3:
-                school = soup.find('div', class_='colname').text.strip()
-                department = soup.find('div', class_='gsdname').text.strip()
-
-                # 4. 提取文字並轉成 List
-                # stripped_strings 會自動去掉空白，並將 <br> 分隔的文字拆開
-                subjects_list = list(target_td[0].stripped_strings)
-
-                # fill_grades_csv(school, department, subjects_list, [""] * len(subjects_list), filename="score_table.csv")
-
-                subjects = [s.strip() for s in target_td[0].get_text(separator="\n").split("\n") if s.strip()]
-                # 第二個 g3 是檢定標準 (底標)
-                standards = [s.strip() for s in  target_td[1].get_text(separator="\n").split("\n") if s.strip()]
-                # 第三個 g3 是篩選倍率
-                multipliers = [m.strip() for m in target_td[2].get_text(separator="\n").split("\n") if m.strip()]
-
-                # 3. 完美對齊輸出
-                print(f"【科目】: {subjects[0]} / {subjects[1]}")
-                print(f"【檢定】: {standards[0]} / {standards[1]}")
-                print(f"【倍率】: {multipliers[0]} / {multipliers[1]}")
-                print("--- 成功抓取科目列表 ---")
-                print(subjects_list)
-                time.sleep(1) # 良好爬蟲習慣，每次請求稍微限制速度
+    # print(f"【成功】已建立全新 CSV 檔案：{filename}")
 
 
-            else:
-                print("在該行中找不到 class 為 g3 的欄位")
+def fill_grades_csv(school_name, department, subjects, grades, filename="score_table.csv"):
+    """
+    輸入學校名稱、科目 list、等第 list。
+    自動在 CSV 結尾新增一行，並把等第填入對應的科目下方。
+    """
+    if not os.path.exists(filename):
+        print(f"錯誤：找不到檔案 {filename}，正在自動為您初始化...")
+        init_csv(filename)
+
+    # 1. 讀取現有的 CSV 所有內容
+    with open(filename, mode="r", newline="", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        rows = list(reader)
+
+    if not rows:
+        print("錯誤：檔案完全空白，請先執行 init_csv()")
+        return
+
+    headers = rows[0]  # 第一行永遠是標題：['學系/科目', '國文', '數學A', ...]
+
+    # 2. 建立新的一列資料，預設全部留空
+    # 長度與標題一樣長，例如：['', '', '', '', '', '', '']
+    new_row = [""] * len(headers)
+
+    # 將第一格（學系/科目）填入你指定的學校名稱
+    new_row[0] = school_name
+    new_row[1] = department
+
+    # 3. 偵測並比對兩組 list
+    for sub, grade in zip(subjects, grades):
+        if sub in headers:
+            col_idx = headers.index(sub)  # 找到科目所在的直欄編號
+            new_row[col_idx] = grade  # 把等第填入該位置
+            print(f"[{school_name}] 成功對應：【{sub}】填入 -> {grade}")
         else:
-            print("找不到『校系代碼』儲存格")
+            print(f"[{school_name}] 跳過：標題中沒有【{sub}】這個科目。")
 
+    # 4. 將這一行新資料追加（Append）到原本的 rows 裡面
+    rows.append(new_row)
 
-    except Exception as e:
-        print(f"程式執行發生異常: {e}")
+    # 5. 寫回 CSV 檔案
+    with open(filename, mode="w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerows(rows)
 
+    print(f"【成功】{school_name} 的資料已寫入 {filename}！\n")
 
 if __name__ == "__main__":
-    # 以國立台灣大學為例，colno=001，colname=國立台灣大學
-    step3_get_all_pdf(code="001022")
+    init_csv("my_report.csv")  # 確保 CSV 檔案存在且有正確的標題
+    # 測試用：模擬填入一筆資料
+    for i in range(3):
+        fill_grades_csv(
+            school_name="國立台灣大學",
+            department="資訊工程學系",
+            subjects=["國文", "數學A", "英文"],
+            grades=["甲等", "乙等", "甲等"],
+            filename="my_report.csv"
+        )
