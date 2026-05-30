@@ -15,11 +15,11 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Referer': MAIN_URL  # 關鍵：下一隻程式存取時，必須假裝是從這個主頁點進去的
 }
+session = requests.Session()
 
 def step1_get_all_links():
     """ 第一步：負責抓取所有學校的子網頁連結 """
     print("【第一階段】開始抓取所有網頁連結...")
-    session = requests.Session()
     response = session.get(MAIN_URL, headers={'User-Agent': HEADERS['User-Agent']})
     response.encoding = 'utf-8'
     
@@ -44,7 +44,6 @@ def step1_get_all_links():
 def step2_process_links(url_list):
     """ 第二步：接收上一步的連結列表，並帶上 Referer 進行深入爬取 """
     print("【第二階段】開始處理收集到的連結...")
-    session = requests.Session()
     
     university_codes = []
     for item in url_list[0:2]:
@@ -85,11 +84,10 @@ def step3_get_all_pdf(code):
     }
 
     # 啟用 requests Session 提高連線效率
-    session = requests.Session()
     session.headers.update(headers)
 
     try:
-        response = session.get(base_url)
+        response = session.get(base_url, timeout=10)
         if response.status_code != 200:
             print(f"無法連線到主頁面，狀態碼：{response.status_code}")
             exit()
@@ -97,6 +95,8 @@ def step3_get_all_pdf(code):
         # 解析主頁面（所有學校列表）
         soup = BeautifulSoup(response.content, "html.parser", from_encoding="utf-8")
        
+        school = soup.find('div', class_='colname').text.strip()
+        department = soup.find('div', class_='gsdname').text.strip()
         code_title_td = soup.find("td", string="校系代碼")
 
         if code_title_td:
@@ -109,8 +109,6 @@ def step3_get_all_pdf(code):
 
 
             if target_td and len(target_td) >= 3:
-                school = soup.find('div', class_='colname').text.strip()
-                department = soup.find('div', class_='gsdname').text.strip()
 
                 # 4. 提取文字並轉成 List
                 # stripped_strings 會自動去掉空白，並將 <br> 分隔的文字拆開
