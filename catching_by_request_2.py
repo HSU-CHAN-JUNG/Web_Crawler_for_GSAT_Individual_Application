@@ -28,7 +28,7 @@ def get_university_codes():
     soup = BeautifulSoup(response.text, 'html.parser')
     all_urls = []
     
-    output_filename = "universities_code_.jsonl"
+    output_filename = "universities_code.jsonl"
     with open(output_filename, "w", encoding="utf-8") as f:
         for a_tag in soup.find_all('a'):
             href = a_tag.get('href')
@@ -121,7 +121,7 @@ def get_all_pdf(code, ):
 
 
 
-def init_csv(filename="test_table2.csv"):
+def init_csv(filename="test_table.csv"):
     """初始化 CSV 檔案，單純寫入第一行的標題欄位"""
     headers = ["學校", "學系", "國文", "數學A", "數學B", "英文", "自然", "社會"]
 
@@ -132,7 +132,7 @@ def init_csv(filename="test_table2.csv"):
     # print(f"【成功】已建立全新 CSV 檔案：{filename}")
 
 
-def fill_grades_csv(school_name, department, subjects, grades, filename="test_table2.csv"):
+def fill_grades_csv(school_name, department, subjects, grades, filename="test_table.csv"):
     """
     輸入學校名稱、科目 list、等第 list。
     自動在 CSV 結尾新增一行，並把等第填入對應的科目下方。
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     collected_links = get_university_codes()
 
     # 讀取外部的 .json 檔案
-    with open("universities_code_.jsonl", "r", encoding="utf-8") as f:
+    with open("universities_code.jsonl", "r", encoding="utf-8") as f:
         data = [json.loads(line) for line in f]
 
     init_csv()  # 在開始抓取 PDF 前，先確保 CSV 已經初始化好了
