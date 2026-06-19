@@ -8,7 +8,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
+# from webdriver_manager.chrome import ChromeDriverManager
 # 載入 openpyxl 的相關模組
 from openpyxl import Workbook
 # 資料存取和時間的封包
@@ -16,13 +16,13 @@ import pandas as pd
 import time
 # 設定 chorme driver 的執行路徑
 
-# options = Options()
-# options.chrome_executable_path = r"C:\Users\User\python\chromedriver_win32\chromedriver.exe"
-# options.add_experimental_option('excludeSwitches', ['enable-logging'])
+options = Options()
+options.chrome_executable_path = r"C:\Users\User\python\chromedriver_win32\chromedriver.exe"
+options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
 # 建立 Driver 物件實體，用程式操作瀏覽器運行
-driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
-# driver = webdriver.Chrome(options=options)
+# driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
+driver = webdriver.Chrome(options=options)
 # 到校系分則的網站
 # driver.get("https://www.cac.edu.tw/apply113/system/ColQry_vforStu113apply_GF84ad9zx/TotalGsdShow.htm")
 driver.get("https://www.cac.edu.tw/apply115/system/ColQry_115xappLyfOrStu_Azd5gP29/TotalGsdShow.htm")
@@ -85,7 +85,7 @@ for university in universities :
             # print(colloge.text ,department.text ,'都不採計')
             ws.cell(i, 3).value = "均不採計"
         # Excel存檔
-        wb.save('採計數學.xlsx') 
+        wb.save('115採計數學.xlsx') 
         i = i + 1
         # 關閉當前分頁，回到前一頁
         driver.close()

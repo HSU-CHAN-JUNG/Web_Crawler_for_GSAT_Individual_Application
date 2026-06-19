@@ -121,7 +121,7 @@ def get_all_pdf(code, ):
 
 
 
-def init_csv(filename="test_table.csv"):
+def init_csv(filename="table.csv"):
     """初始化 CSV 檔案，單純寫入第一行的標題欄位"""
     headers = ["學校", "學系", "國文", "數學A", "數學B", "英文", "自然", "社會"]
 
@@ -132,7 +132,7 @@ def init_csv(filename="test_table.csv"):
     # print(f"【成功】已建立全新 CSV 檔案：{filename}")
 
 
-def fill_grades_csv(school_name, department, subjects, grades, filename="test_table.csv"):
+def fill_grades_csv(school_name, department, subjects, grades, filename="table.csv"):
     """
     輸入學校名稱、科目 list、等第 list。
     自動在 CSV 結尾新增一行，並把等第填入對應的科目下方。
